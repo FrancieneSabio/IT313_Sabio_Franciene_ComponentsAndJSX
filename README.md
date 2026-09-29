@@ -1,56 +1,83 @@
-# Welcome to your Expo app 👋
+# Student Roster Card Renderer — IT313 Lab 4
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+## The Problem
 
-## Get started
+Render each currently enrolled student as a reusable card, using
+component-based architecture, props, JSX expressions, conditional
+rendering, and list rendering with a stable `key`.
 
-1. Install dependencies
+## Component Structure
 
-   ```bash
-   npm install
-   ```
+- **`StudentCard.js`** — a small, reusable, purely presentational
+  component. It receives `name`, `course`, `units`, and `isFullLoad`
+  as props (destructured directly in the function signature) and
+  renders them. It has no knowledge of the full roster — it only
+  knows how to display one student. The "Full Load" label is shown
+  conditionally with `{isFullLoad && <Text>Full Load</Text>}`.
 
-2. Start the app
+- **`StudentRoster.js`** — the parent/container component. It owns
+  the `students` data (as state, so the list can be reordered), and
+  is responsible for turning that array into a list of `StudentCard`
+  elements with `.map()` (via `FlatList`'s `renderItem`), each keyed
+  by the student's stable `id`. It also computes and displays the
+  total student count using a JSX expression built from a template
+  literal: ``{`${roster.length} students enrolled`}``.
 
-   ```bash
-   npx expo start
-   ```
+- **`App.js`** — the entry point that just renders `StudentRoster`
+  inside a `SafeAreaView`.
 
-In the output, you'll find options to open the app in a
+This split matters because `StudentCard` stays dumb and reusable —
+it doesn't care where its data comes from — while `StudentRoster` is
+the only place that knows about the array, the mapping, and the key
+prop.
 
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
-
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
-
-## Get a fresh project
-
-When you're ready, run:
+## How to Run
 
 ```bash
-npm run reset-project
+npx create-expo-app StudentRoster
+# then copy App.js, StudentCard.js, StudentRoster.js into the project
+cd StudentRoster
+npx expo start
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+Scan the QR code with Expo Go, or press `i` / `a` for a simulator.
 
-### Other setup steps
+## The Array-Index-as-Key Experiment
 
-- To set up ESLint for linting, run `npx expo lint`, or follow our guide on ["Using ESLint and Prettier"](https://docs.expo.dev/guides/using-eslint/)
-- If you'd like to set up unit testing, follow our guide on ["Unit Testing with Jest"](https://docs.expo.dev/develop/unit-testing/)
-- Learn more about the TypeScript setup in this template in our guide on ["Using TypeScript"](https://docs.expo.dev/guides/typescript/)
+`StudentRoster.js` includes a comment block showing how to swap the
+`id`-based key for an index-based one:
 
-## Learn more
+```js
+keyExtractor={(item, index) => index.toString()}
+```
 
-To learn more about developing your project with Expo, look at the following resources:
+After swapping in the index key and pressing "Reverse Order," the
+list still _looks_ correct here because `StudentCard` is stateless —
+its rendered text always matches whatever `item` React hands it for
+that key. The real danger shows up once a card holds its own local
+state (say, an expanded/collapsed toggle). With index keys, React
+matches components to list _positions_, not to the _data_. So when
+the array reorders, React thinks "the component at position 0 didn't
+change" and keeps that component instance — including its local
+state — in place, even though a different student's data is now
+being rendered there. The state and the data become mismatched.
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+Keying by `student.id` fixes this: React tracks each component
+instance by the student it represents, wherever that student ends up
+in the array, so state and data always stay attached to the same
+student.
 
-## Join the community
+## A Problem You're Likely to Hit
 
-Join our community of developers creating universal apps.
+Forgetting the `key` prop entirely (or using a non-unique one)
+triggers React's warning: `Warning: Each child in a list should have
+a unique "key" prop.` It doesn't crash the app, but it's a sign React
+can't reliably track which list item is which across re-renders,
+which is exactly the bug demonstrated above. The fix is always the
+same: use a value that's both unique and stable across renders — an
+existing ID field, not the array index.
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+Another common one: forgetting to wrap `StudentRoster`'s return
+value in a single root element (a `View` or a `<>...</>` Fragment)
+causes a JSX parse error, since JSX only allows one top-level
+element per return.
